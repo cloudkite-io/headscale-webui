@@ -630,6 +630,9 @@ def build_preauth_key_table(user_name):
     return preauth_keys_collection
 
 def oidc_nav_dropdown(user_name, email_address, name):
+    user_name = str(user_name)
+    email_address = str(email_address)
+    name = str(name)
     app.logger.info("OIDC is enabled.  Building the OIDC nav dropdown")
     html_payload = """
         <!-- OIDC Dropdown Structure -->

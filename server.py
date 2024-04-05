@@ -36,7 +36,7 @@ app.logger.info("DEBUG STATE:  %s", str(DEBUG_STATE))
 ########################################################################################
 # Set Authentication type.  Currently "OIDC" and "BASIC"
 ########################################################################################
-if AUTH_TYPE == "oidc":
+if AUTH_TYPE == "oidc" or AUTH_TYPE == "google":
     # Currently using: flask-providers-oidc - https://pypi.org/project/flask-providers-oidc/ 
     #
     # https://gist.github.com/thomasdarimont/145dc9aa857b831ff2eff221b79d179a/ 
@@ -49,25 +49,42 @@ if AUTH_TYPE == "oidc":
     OIDC_SECRET    = os.environ["OIDC_CLIENT_SECRET"]
     OIDC_CLIENT_ID = os.environ["OIDC_CLIENT_ID"]
     OIDC_AUTH_URL  = os.environ["OIDC_AUTH_URL"]
-
-    # Construct client_secrets.json:
-    response = requests.get(str(OIDC_AUTH_URL))
-    oidc_info = response.json()
-    app.logger.debug("JSON Dumps for OIDC_INFO:  "+json.dumps(oidc_info))
-
-    client_secrets = json.dumps(
-        {
-            "web": {
-                "issuer": oidc_info["issuer"],
-                "auth_uri": oidc_info["authorization_endpoint"],
-                "client_id": OIDC_CLIENT_ID,
-                "client_secret": OIDC_SECRET,
-                "redirect_uris": [DOMAIN_NAME + BASE_PATH + "/oidc_callback"],
-                "userinfo_uri": oidc_info["userinfo_endpoint"],
-                "token_uri": oidc_info["token_endpoint"],
+    OIDC_TOKEN_ENDPOINT = os.environ.get("OIDC_TOKEN_ENDPOINT")
+    OIDC_GOOGLE_APPS_DOMAIN = os.environ.get("OIDC_GOOGLE_APPS_DOMAIN")
+    if AUTH_TYPE == "google":
+        # Construct client_secrets.json
+        client_secrets = json.dumps(
+            {
+                "web": {
+                    "issuer": "https://accounts.google.com",
+                    "auth_uri": OIDC_AUTH_URL,
+                    "client_id": OIDC_CLIENT_ID,
+                    "client_secret": OIDC_SECRET,
+                    "redirect_uris": [f"{DOMAIN_NAME}/{BASE_PATH}/oidc_callback"],
+                    "userinfo_uri": "https://www.googleapis.com/oauth2/v1/userinfo?alt=json",
+                    "token_uri": OIDC_TOKEN_ENDPOINT,
+                }
             }
-        }
-    )
+        )
+    else:
+        # Construct client_secrets.json:
+        response = requests.get(str(OIDC_AUTH_URL))
+        oidc_info = response.json()
+        app.logger.debug("JSON Dumps for OIDC_INFO:  "+json.dumps(oidc_info))
+
+        client_secrets = json.dumps(
+            {
+                "web": {
+                    "issuer": oidc_info["issuer"],
+                    "auth_uri": oidc_info["authorization_endpoint"],
+                    "client_id": OIDC_CLIENT_ID,
+                    "client_secret": OIDC_SECRET,
+                    "redirect_uris": [DOMAIN_NAME + BASE_PATH + "/oidc_callback"],
+                    "userinfo_uri": oidc_info["userinfo_endpoint"],
+                    "token_uri": oidc_info["token_endpoint"],
+                }
+            }
+        )
 
     with open("/app/instance/secrets.json", "w+") as secrets_json:
         secrets_json.write(client_secrets)
@@ -86,7 +103,8 @@ if AUTH_TYPE == "oidc":
         'OIDC_USER_INFO_ENABLED': True,
         'OIDC_OPENID_REALM': 'Headscale-WebUI',
         'OIDC_SCOPES': ['openid', 'profile', 'email'],
-        'OIDC_INTROSPECTION_AUTH_METHOD': 'client_secret_post'
+        'OIDC_INTROSPECTION_AUTH_METHOD': 'client_secret_post',
+        'OIDC_GOOGLE_APPS_DOMAIN': OIDC_GOOGLE_APPS_DOMAIN
     })
     from flask_oidc import OpenIDConnect
     oidc = OpenIDConnect(app)
